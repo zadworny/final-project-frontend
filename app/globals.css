@@ -2,9 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Color scheme variables */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary-color: #3b82f6; /* Tailwind blue-500 */
+  --secondary-color: #d1d5db; /* Tailwind gray-300 */
+  --accent-color: #14b8a6; /* Tailwind teal-500 */
+  --error-color: #e53e3e; /* Tailwind red-600 */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -14,14 +19,70 @@
   }
 }
 
+/* General body styles */
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Links */
+a {
+  color: var(--primary-color);
+  transition: color 0.3s ease;
+}
+
+a:hover {
+  color: var(--accent-color);
+}
+
+/* Buttons */
+.btn {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem; /* Tailwind rounded-md */
+  font-weight: bold;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.btn:hover {
+  background-color: var(--accent-color);
+  transform: scale(1.05);
+}
+
+.btn-disabled {
+  background-color: var(--secondary-color);
+  cursor: not-allowed;
+}
+
+/* Input fields */
+.input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--secondary-color);
+  border-radius: 0.375rem; /* Tailwind rounded-md */
+  outline: none;
+  transition: border-color 0.2s ease;
+  color: var(--background);
+}
+
+.input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); /* Blue focus ring */
+}
+
+/* Error messages */
+.text-error {
+  color: var(--error-color);
+  font-size: 0.875rem; /* Tailwind text-sm */
+  margin-top: 0.5rem;
+}
+
+/* Text and titles */
+.text-4xl {
+  font-size: 2.25rem;
+  line-height: .5rem;
 }

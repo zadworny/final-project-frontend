@@ -13,13 +13,12 @@ export default function AuctionDetails() {
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
 
-  const auction = auctions.find(a => a.id === Number(id));
+  const auction = auctions.find((a) => a.id === Number(id));
 
   if (!auction) {
     return <div>Auction not found</div>;
   }
 
-  // there is an error with this, it isn't working well
   const handleBid = (e: React.FormEvent) => {
     e.preventDefault();
     const bid = parseFloat(bidAmount);
@@ -28,60 +27,64 @@ export default function AuctionDetails() {
     } else if (balance && bid > parseFloat(balance.formatted)) {
       setError(`Bid cannot exceed your wallet balance of ${balance.formatted} ${balance.symbol}`);
     } else {
-      // Send bid to backend
       console.log(`Placed bid of $${bid}`);
       setError('');
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
+    <div className="max-w-6xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="flex flex-col md:flex-row ">
+        <div className="flex flex-col md:flex-row">
           {/* Image Section */}
-          <div className="md:w-1/2 bg-gray-300">
+          <div className="md:w-1/2 bg-gray-200">
             <div className="relative w-full h-[500px]">
               <Image 
                 src={auction.image} 
                 alt={auction.title} 
-                fill
-                style={{objectFit: "contain"}}
-                sizes="(max-width: 768px) 100vw, 50vw"
+                fill 
+                style={{ objectFit: 'contain' }} 
+                sizes="(max-width: 768px) 100vw, 50vw" 
+                className="rounded-t-md md:rounded-none"
               />
             </div>
           </div>
-          
+
           {/* Details and Bidding Section */}
-          <div className="md:w-1/2 p-6">
-            <h1 className="text-3xl font-bold mb-4">{auction.title}</h1>
-            <p className="text-gray-600 mb-4">{auction.description}</p>
-            <div className="mb-4">
-              <p className="text-xl font-semibold">Current Bid: ${auction.currentBid}</p>
-              <p className="text-sm text-gray-500">Auction ends: {new Date(auction.endTime).toLocaleString()}</p>
+          <div className="md:w-1/2 p-8 bg-gray-50">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">{auction.title}</h1>
+            <p className="text-lg text-gray-800 mb-4">{auction.description}</p>
+            <div className="mb-6">
+              <p className="text-2xl font-semibold text-gray-900">Current Bid: ${auction.currentBid}</p>
+              <p className="text-sm text-gray-600">Auction ends: {new Date(auction.endTime).toLocaleString()}</p>
             </div>
+
             {isConnected ? (
               <form onSubmit={handleBid} className="mt-6">
-                <div className="mb-4">
+                <div className="mb-6">
                   <label htmlFor="bidAmount" className="block text-sm font-medium text-gray-700">Your Bid</label>
                   <input
                     type="number"
                     id="bidAmount"
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-gray-900"
+                    className="input" // Using the global .input class
                     placeholder="Enter bid amount"
-                    min={auction.currentBid + 1}
+                    min={auction.currentBid}
                     step="0.01"
                     required
                   />
                 </div>
-                <button type="submit" className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors">
+                <button
+                  type="submit"
+                  className="btn w-full" // Using the global .btn class
+                >
                   Place Bid
                 </button>
-                {error && <p className="mt-2 text-red-500">{error}</p>}
+                {error && <p className="text-error">{error}</p>} {/* Using the global .text-error class */}
               </form>
             ) : (
-              <p className="mt-4 text-center text-gray-600">Please connect your wallet to place a bid.</p>
+              <p className="mt-6 text-center text-gray-700">Please connect your wallet to place a bid.</p>
             )}
           </div>
         </div>

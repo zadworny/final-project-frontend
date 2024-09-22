@@ -13,7 +13,7 @@ export const auctions: Auction[] = [
     id: 1, 
     title: "Vintage Watch", 
     image: "/watch.jpeg", 
-    currentBid: 0.2, 
+    currentBid: 2.2, 
     endTime: "2024-10-01T15:00:00",
     description: "A beautiful vintage watch from the 1960s."
   },
