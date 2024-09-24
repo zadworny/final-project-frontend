@@ -13,6 +13,7 @@ interface FormData {
   auctionStartTime: string;
   auctionEndTime: string;
   image: File | null;
+  imageIpfsHash: string | null; // IPFS
 }
 
 interface FormErrors {
@@ -45,6 +46,7 @@ export default function CreateAuction() {
     auctionStartTime: "",
     auctionEndTime: "",
     image: null,
+    imageIpfsHash: null, // IPFS
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -96,7 +98,7 @@ export default function CreateAuction() {
     }
   };
 
-  const handleImageUpload = useCallback(
+  /*const handleImageUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -106,6 +108,42 @@ export default function CreateAuction() {
           setImagePreview(reader.result as string);
         };
         reader.readAsDataURL(file);
+      }
+    },
+    []
+  );*/
+
+  // NEW
+  const handleImageUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setFormData((prev) => ({ ...prev, image: file }));
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+
+        // IPFS: Upload image to IPFS using Pinata
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const res = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              pinata_api_key: "22a955acaec92cf92387",
+              pinata_secret_api_key: "ca0c0f022cea0ffa712139ea815533ecfa6e3ddfd7d36397c9bb4ba435656054",
+            },
+          });
+
+          const ipfsHash = res.data.IpfsHash;
+          setFormData((prev) => ({ ...prev, imageIpfsHash: ipfsHash }));
+          console.log("Image uploaded to IPFS:", ipfsHash);
+        } catch (error) {
+          console.error("Error uploading image to IPFS:", error);
+        }
       }
     },
     []
