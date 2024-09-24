@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, http, parseEther } from 'viem';
 import { sepolia } from 'viem/chains';
+import { useAccount, useWalletClient } from 'wagmi';
 
 export const CONTRACT_ABI = [
 	{
@@ -298,98 +299,163 @@ export const CONTRACT_ABI = [
 ];
 export const CONTRACT_ADDRESS = '0x7194C573Ee4ed6E6DE8C4c03392024be658A0496';
 
-interface ContractContextType {
-  client: any;
-  price: number;
-  fetchPrice: () => void;
-  finalizeAuction: (itemId: number) => Promise<void>;
-  placeBid: (itemId: number, bidAmount: number) => Promise<void>;
-}
-
-const ContractContext = createContext<ContractContextType | undefined>(undefined);
-
-export const ContractProvider = ({ children }: { children: ReactNode }) => {
-  const [client, setClient] = useState<any>(null);
-  const [price, setPrice] = useState<number>(0);
-
-  useEffect(() => {
-    const clientInstance = createPublicClient({
-      chain: sepolia,
-      transport: http(),
-    });
-    console.log('Client instance created:', clientInstance);
-    setClient(clientInstance);
-  }, []);
-
-  const fetchPrice = async () => {
-    if (client) {
-      try {
-        const result = await client.readContract({
-          address: CONTRACT_ADDRESS,
-          abi: CONTRACT_ABI,
-          functionName: 'getLatestETHUSDPrice'
-        });
-        console.log('Contract call result:', result);
-        const adjustedPrice = Number(result) / 100000000;
-        const formattedPrice = adjustedPrice.toFixed(2);
-        setPrice(Number(formattedPrice));
-      } catch (error) {
-        console.error('Error interacting with contract:', error);
-        setPrice(0);
-      }
-    }
-  };
-
-  const finalizeAuction = async (itemId: number) => {
-    if (client) {
-      try {
-        await client.writeContract({
-          address: CONTRACT_ADDRESS,
-          abi: CONTRACT_ABI,
-          functionName: 'finalizeAuction',
-          args: [itemId]
-        });
-        console.log(`Auction for item ${itemId} finalized.`);
-      } catch (error) {
-        console.error('Error finalizing auction:', error);
-      }
-    }
-  };
-
-  const placeBid = async (itemId: number, bidAmount: number) => {
-    if (client) {
-      try {
-        await client.writeContract({
-          address: CONTRACT_ADDRESS,
-          abi: CONTRACT_ABI,
-          functionName: 'placeBid',
-          args: [itemId],
-          value: bidAmount
-        });
-        console.log(`Bid of ${bidAmount} placed on item ${itemId}.`);
-      } catch (error) {
-        console.error('Error placing bid:', error);
-      }
-    }
-  };
-
-  // OTHER FUNCTIONS HERE...
-
-  useEffect(() => {
-    fetchPrice();
-  }, [client]);
-
-  return (
-    <ContractContext.Provider value={{ client, price, fetchPrice, finalizeAuction, placeBid }}>
-      {children}
-    </ContractContext.Provider>
-  );
-};
-
-export const useContract = () => {
-  const context = useContext(ContractContext);
-  if (context === undefined) {
-    throw new Error('useContract must be used within a ContractProvider');
+interface Auction {
+	itemId: number;
+	owner: string;
+	name: string;
+	description: string;
+	price: number;
+	highestBidder: string;
+	highestBidPrice: number;
+	expiryDate: number;
+	isSold: boolean;
+	imageUrl: string;
   }
-  return context;
-};
+  
+  interface ContractContextType {
+	client: any;
+	price: number;
+	fetchPrice: () => void;
+	finalizeAuction: (itemId: number) => Promise<void>;
+	placeBid: (itemId: number, bidAmount: number) => Promise<void>;
+	fetchAuctions: () => Promise<Auction[]>;
+  }
+  
+  const ContractContext = createContext<ContractContextType | undefined>(undefined);
+  
+  export const ContractProvider = ({ children }: { children: ReactNode }) => {
+	const { address } = useAccount(); // Get user's address
+	const { data: walletClient } = useWalletClient(); // Get the wallet client
+	const [client, setClient] = useState<any>(null);
+	const [price, setPrice] = useState<number>(0);
+  
+	useEffect(() => {
+	  const clientInstance = createPublicClient({
+		chain: sepolia,
+		transport: http(),
+	  });
+	  console.log('Client instance created:', clientInstance);
+	  setClient(clientInstance);
+	}, []);
+  
+	const fetchPrice = async () => {
+	  if (client) {
+		try {
+		  const result = await client.readContract({
+			address: CONTRACT_ADDRESS,
+			abi: CONTRACT_ABI,
+			functionName: 'getLatestETHUSDPrice',
+		  });
+		  console.log('Contract call result:', result);
+		  const adjustedPrice = Number(result) / 100000000;
+		  const formattedPrice = adjustedPrice.toFixed(2);
+		  setPrice(Number(formattedPrice));
+		} catch (error) {
+		  console.error('Error interacting with contract:', error);
+		  setPrice(0);
+		}
+	  }
+	};
+  
+	const placeBid = async (itemId: number, bidAmount: number) => {
+	  try {
+		if (!walletClient) {
+		  throw new Error('No wallet client available');
+		}
+		if (!address) {
+		  throw new Error('No account address available');
+		}
+		const txHash = await walletClient.writeContract({
+		  address: CONTRACT_ADDRESS,
+		  abi: CONTRACT_ABI,
+		  functionName: 'placeBid',
+		  args: [itemId],
+		  value: parseEther(bidAmount.toString()),
+		  account: address,
+		  chain: sepolia,
+		});
+		console.log(`Bid of ${bidAmount} placed on item ${itemId}. Transaction hash: ${txHash}`);
+	  } catch (error) {
+		console.error('Error placing bid:', error);
+		throw error; // Rethrow error to be handled by the calling function
+	  }
+	};
+  
+	const finalizeAuction = async (itemId: number) => {
+	  try {
+		if (!walletClient) {
+		  throw new Error('No wallet client available');
+		}
+		if (!address) {
+		  throw new Error('No account address available');
+		}
+		const txHash = await walletClient.writeContract({
+		  address: CONTRACT_ADDRESS,
+		  abi: CONTRACT_ABI,
+		  functionName: 'finalizeAuction',
+		  args: [itemId],
+		  account: address,
+		  chain: sepolia,
+		});
+		console.log(`Auction for item ${itemId} finalized. Transaction hash: ${txHash}`);
+	  } catch (error) {
+		console.error('Error finalizing auction:', error);
+	  }
+	};
+  
+	const fetchAuctions = async (): Promise<Auction[]> => {
+	  if (!client) {
+		throw new Error('No client available');
+	  }
+	  try {
+		const itemCount = await client.readContract({
+		  address: CONTRACT_ADDRESS,
+		  abi: CONTRACT_ABI,
+		  functionName: 'itemCount',
+		});
+		const auctions: Auction[] = [];
+		for (let i = 0; i < itemCount; i++) {
+		  const item = await client.readContract({
+			address: CONTRACT_ADDRESS,
+			abi: CONTRACT_ABI,
+			functionName: 'items',
+			args: [i],
+		  });
+		  auctions.push({
+			itemId: item.itemId,
+			owner: item.owner,
+			name: item.name,
+			description: item.description,
+			price: Number(item.price),
+			highestBidder: item.highestBidder,
+			highestBidPrice: Number(item.highestBidPrice),
+			expiryDate: Number(item.expiryDate),
+			isSold: item.isSold,
+			imageUrl: item.imageUrl,
+		  });
+		}
+		return auctions;
+	  } catch (error) {
+		console.error('Error fetching auctions:', error);
+		throw error;
+	  }
+	};
+  
+	useEffect(() => {
+	  fetchPrice();
+	}, [client]);
+  
+	return (
+	  <ContractContext.Provider value={{ client, price, fetchPrice, finalizeAuction, placeBid, fetchAuctions }}>
+		{children}
+	  </ContractContext.Provider>
+	);
+  };
+  
+  export const useContract = () => {
+	const context = useContext(ContractContext);
+	if (context === undefined) {
+	  throw new Error('useContract must be used within a ContractProvider');
+	}
+	return context;
+  };
