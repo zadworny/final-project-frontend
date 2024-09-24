@@ -5,56 +5,42 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAccount, useBalance } from 'wagmi';
 import Image from 'next/image';
-import { auctions, Auction } from '@/library/components/mockdb';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useContract } from '@/library/contexts/ContractContext'; // NEW 1/3
-import api from '@/app/api';
-
+import { auctions } from '@/library/components/mockdb';
+import { useContract } from '@/library/contexts/ContractContext';
 
 export default function AuctionDetails() {
   const { id } = useParams();
-  const { address, isConnected } = useAccount();
-  const { data: balance } = useBalance({ address });
+  const { isConnected } = useAccount();
+  const { data: balance } = useBalance();
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
-  const queryClient = useQueryClient();
-  const { price } = useContract(); // NEW 2/3
+  const { price, placeBid } = useContract();
 
-  const { data: auction, isLoading, isError } = useQuery<Auction>({
-    queryKey: ['auction', id],
-    queryFn: () => api.get(`/auctions/${id}`).then(res => res.data),
-  });
+  const auction = auctions.find((a) => a.id === Number(id));
 
-  const placeBidMutation = useMutation({
-    mutationFn: (bidData: { auctionId: string; bidAmount: number }) => 
-      api.post(`/auctions/${bidData.auctionId}/bid`, bidData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auction', id as string] });
-      setBidAmount('');
-      setError('');
-    },
-    onError: (error: any) => {
-      setError(error.response?.data?.message || 'An error occurred while placing the bid');
-    },
-  });
+  if (!auction) {
+    return <div>Auction not found</div>;
+  }
 
-  const handleBid = (e: React.FormEvent) => {
+  const handleBid = async (e: React.FormEvent) => {
     e.preventDefault();
     const bid = parseFloat(bidAmount);
-    if (!auction) return;
 
     if (bid <= auction.currentBid) {
       setError(`Bid must be higher than the current bid of Ξ${auction.currentBid}`);
     } else if (balance && bid > parseFloat(balance.formatted)) {
       setError(`Bid cannot exceed your wallet balance of ${balance.formatted} ${balance.symbol}`);
     } else {
-      placeBidMutation.mutate({ auctionId: id as string, bidAmount: bid });
+      try {
+        await placeBid(auction.id, bid);
+        alert(`Placed bid of Ξ${bid}`);
+        setError('');
+      } catch (err) {
+        setError('Error placing bid, please try again.');
+        console.error('Error during placing bid:', err);
+      }
     }
   };
-
-  if (isLoading) return <div>Loading...</div>;
-  if (isError) return <div>Error loading auction details</div>;
-  if (!auction) return <div>Auction not found</div>;
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -79,8 +65,10 @@ export default function AuctionDetails() {
             <h1 className="text-4xl font-bold text-gray-900 mb-4">{auction.name}</h1>
             <p className="text-lg text-gray-800 mb-4">{auction.description}</p>
             <div className="mb-6 space-y-2">
-              <p className="text-2xl font-semibold text-gray-900 ">Current Bid: Ξ{auction.currentBid}</p>
-              {/* <p className="text-sm text-gray-600">Starting Bid: ${auction.startBidPrice}</p> */}
+              <p className="text-2xl font-semibold text-gray-900 ">
+                Current Bid: Ξ{auction.currentBid} 
+                <span className="text-gray-400 font-normal">&nbsp;${parseFloat((price * auction.currentBid).toFixed(2)).toLocaleString()}</span>
+              </p>
               <p className="text-sm text-gray-600 font-semibold">Start Time: {new Date(auction.startTime).toLocaleString()}</p>
               <p className="text-sm text-gray-600 font-semibold">End Time: {new Date(auction.endTime).toLocaleString()}</p>
               <p className={`text-sm font-semibold ${auction.status === 'ongoing' ? 'text-green-600' : 'text-red-600'}`}>
@@ -120,7 +108,7 @@ export default function AuctionDetails() {
               <div className="mt-6 p-4 bg-gray-100 rounded-md">
                 <h2 className="text-xl font-semibold text-gray-800 mb-2">Auction Ended</h2>
                 <p className="text-gray-700">
-                  Winning Bid: <span className="font-semibold">${auction.currentBid}</span>
+                  Winning Bid: <span className="font-semibold">Ξ{auction.currentBid}</span>
                 </p>
                 <p className="text-gray-700">
                   Winner: <span className="font-semibold">{auction.winnerId || 'No winner'}</span>
@@ -131,11 +119,9 @@ export default function AuctionDetails() {
         </div>
       </div>
 
-      {/* NEW 3/3 */}
-      <p className={price==0 ? 'text-red-500' : 'text-gray-900'}>
+      <p className={price === 0 ? 'text-red-500' : 'text-gray-900'}>
         <br/>Latest ETH/USD Price: <span className="text-gray-400">&nbsp;${price.toLocaleString()}</span>
       </p>
-      
     </div>
   );
 }
