@@ -19,6 +19,7 @@ import {
   QueryClientProvider,
   QueryClient,
 } from "@tanstack/react-query";
+import { ContractProvider } from '@/library/contexts/ContractContext'; // NEW
 
 const config = getDefaultConfig({
   appName: 'My RainbowKit App',
