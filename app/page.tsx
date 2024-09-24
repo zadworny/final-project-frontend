@@ -1,6 +1,8 @@
-// app/page.tsx
+'use client'; // NEW
+
 import Link from 'next/link';
 import Image from 'next/image';
+import { useContract } from '@/library/contexts/ContractContext'; // NEW 1/3
 import { Auction, auctions } from '@/library/components/mockdb';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -11,7 +13,7 @@ const fetchAuctions = async (): Promise<Auction[]> => {
   return data.auctions;
 };
 
-const AuctionCard = ({ id, name, image, currentBid, endTime, status }: Auction) => (
+const AuctionCard = ({ id, name, image, currentBid, endTime, status, price }: Auction & { price: number }) => ( // NEW (price added) + line 35
   <Link href={`/auction/${id}`} className="block">
     <div className="bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105">
       <div className="relative w-full h-48">
@@ -30,7 +32,7 @@ const AuctionCard = ({ id, name, image, currentBid, endTime, status }: Auction) 
       </div>
       <div className="p-4">
         <h3 className="text-lg font-semibold mb-2">{name}</h3>
-        <p className="text-gray-600 font-semibold">Current Bid: Ξ{currentBid}</p>
+        <p className="text-gray-600 font-semibold">Current Bid: Ξ{currentBid} <span className="text-gray-400 font-normal">&nbsp;${(price * currentBid).toFixed(2)}</span></p>
         <p className="text-sm text-gray-500 font-semibold">Ends: {new Date(endTime).toLocaleString()}</p>
       </div>
     </div>
@@ -38,6 +40,7 @@ const AuctionCard = ({ id, name, image, currentBid, endTime, status }: Auction) 
 );
 
 export default function Home() {
+  const { price } = useContract(); // NEW 2/3
   // const { data: auctions, isLoading, error } = useQuery<Auction[], Error>({
   //   queryKey: ['auctions'],
   //   queryFn: fetchAuctions,
@@ -65,6 +68,12 @@ export default function Home() {
           <AuctionCard key={auction.id} {...auction} />
         ))}
       </div>
+
+      {/* NEW 3/3 */}
+      <p className={price==0 ? 'text-red-500' : ''}>
+        <br/>Latest ETH/USD Price: <span className="text-gray-400">&nbsp;${(price).toFixed(2)}</span>
+      </p>
+      
     </div>
   );
 }
