@@ -5,7 +5,10 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAccount, useBalance } from 'wagmi';
 import Image from 'next/image';
-import { auctions } from '@/library/components/mockdb';
+import { auctions, Auction } from '@/library/components/mockdb';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '@/app/api';
+
 
 export default function AuctionDetails() {
   const { id } = useParams();
@@ -13,25 +16,43 @@ export default function AuctionDetails() {
   const { data: balance } = useBalance({ address });
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
+  const queryClient = useQueryClient();
 
-  const auction = auctions.find((a) => a.id === Number(id));
+  const { data: auction, isLoading, isError } = useQuery<Auction>({
+    queryKey: ['auction', id],
+    queryFn: () => api.get(`/auctions/${id}`).then(res => res.data),
+  });
 
-  if (!auction) {
-    return <div>Auction not found</div>;
-  }
+  const placeBidMutation = useMutation({
+    mutationFn: (bidData: { auctionId: string; bidAmount: number }) => 
+      api.post(`/auctions/${bidData.auctionId}/bid`, bidData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auction', id as string] });
+      setBidAmount('');
+      setError('');
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.message || 'An error occurred while placing the bid');
+    },
+  });
 
   const handleBid = (e: React.FormEvent) => {
     e.preventDefault();
     const bid = parseFloat(bidAmount);
+    if (!auction) return;
+
     if (bid <= auction.currentBid) {
-      setError(`Bid must be higher than the current bid of $${auction.currentBid}`);
+      setError(`Bid must be higher than the current bid of Ξ${auction.currentBid}`);
     } else if (balance && bid > parseFloat(balance.formatted)) {
       setError(`Bid cannot exceed your wallet balance of ${balance.formatted} ${balance.symbol}`);
     } else {
-      alert(`Placed bid of Ξ${bid}`);
-      setError('');
+      placeBidMutation.mutate({ auctionId: id as string, bidAmount: bid });
     }
   };
+
+  if (isLoading) return <div>Loading...</div>;
+  if (isError) return <div>Error loading auction details</div>;
+  if (!auction) return <div>Auction not found</div>;
 
   return (
     <div className="max-w-6xl mx-auto p-6">

@@ -2,6 +2,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Auction, auctions } from '@/library/components/mockdb';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+
+
+const fetchAuctions = async (): Promise<Auction[]> => {
+  const { data } = await axios.get('/api/auctions');
+  return data.auctions;
+};
 
 const AuctionCard = ({ id, name, image, currentBid, endTime, status }: Auction) => (
   <Link href={`/auction/${id}`} className="block">
@@ -30,6 +38,25 @@ const AuctionCard = ({ id, name, image, currentBid, endTime, status }: Auction) 
 );
 
 export default function Home() {
+  // const { data: auctions, isLoading, error } = useQuery<Auction[], Error>({
+  //   queryKey: ['auctions'],
+  //   queryFn: fetchAuctions,
+  // });
+
+  // if (isLoading) {
+  //   return <div className="text-center mt-8">Loading...</div>;
+  // }
+
+  // if (error) {
+  //   return (
+  //     <div className="text-center mt-8">
+  //       <p className="text-red-500 font-semibold">
+  //         {error instanceof Error ? error.message : "Couldn't get all auctions. Something went wrong!"}
+  //       </p>
+  //     </div>
+  //   );
+  // }
+  
   return (
     <div className='text-gray-900'>
       <h1 className="text-3xl font-bold mb-6">Auctions</h1>

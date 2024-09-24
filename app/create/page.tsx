@@ -3,13 +3,15 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useAccount } from "wagmi";
 import Image from "next/image";
+import { useMutation } from "@tanstack/react-query";
+import axios from "axios";
 
 interface FormData {
-  title: string;
+  auctionName: string;
   description: string;
   startBidPrice: string;
-  startTime: string;
-  endTime: string;
+  auctionStartTime: string;
+  auctionEndTime: string;
   image: File | null;
 }
 
@@ -18,30 +20,57 @@ interface FormErrors {
   endTime?: string;
 }
 
+const createAuction = async (formData: FormData) => {
+  const formDataToSend = new FormData();
+  Object.entries(formData).forEach(([key, value]) => {
+    if (value !== null) {
+      formDataToSend.append(key, value);
+    }
+  });
+
+  const response = await axios.post("/auctions", formDataToSend, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
 export default function CreateAuction() {
   const { isConnected } = useAccount();
   const [formData, setFormData] = useState<FormData>({
-    title: "",
+    auctionName: "",
     description: "",
     startBidPrice: "",
-    startTime: "",
-    endTime: "",
+    auctionStartTime: "",
+    auctionEndTime: "",
     image: null,
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
 
+  const mutation = useMutation({
+    mutationFn: createAuction,
+    onSuccess: () => {
+      alert("Auction created successfully!");
+      // Reset form or redirect user
+    },
+    onError: (error) => {
+      console.error("Error creating auction:", error);
+      alert("Failed to create auction. Please try again.");
+    },
+  });
+
   useEffect(() => {
-    // Set minimum date-time for start time to now
     const now = new Date();
-    const minDateTime = now.toISOString().slice(0, 16); // format: "YYYY-MM-DDTHH:mm"
+    const minDateTime = now.toISOString().slice(0, 16);
     document.getElementById("startTime")?.setAttribute("min", minDateTime);
   }, []);
 
   const validateDates = () => {
     const now = new Date();
-    const startTime = new Date(formData.startTime);
-    const endTime = new Date(formData.endTime);
+    const startTime = new Date(formData.auctionStartTime);
+    const endTime = new Date(formData.auctionEndTime);
     let newErrors: FormErrors = {};
 
     if (startTime <= now) {
@@ -85,9 +114,7 @@ export default function CreateAuction() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateDates()) {
-      // Upload image to IPFS and data to the backend
-      alert("Auction created");
-      console.log("Auction created:", formData);
+      mutation.mutate(formData);
     } else {
       console.log("Form has errors, please correct them");
     }
@@ -122,7 +149,7 @@ export default function CreateAuction() {
             id="title"
             type="text"
             name="title"
-            value={formData.title}
+            value={formData.auctionName}
             onChange={handleChange}
             required
           />
@@ -166,16 +193,16 @@ export default function CreateAuction() {
         <div className="mb-4">
           <label
             className="block text-gray-700 text-sm font-bold mb-2"
-            htmlFor="startTime"
+            htmlFor="auctionStartTime"
           >
             Start Time
           </label>
           <input
             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            id="startTime"
+            id="auctionStartTime"
             type="datetime-local"
-            name="startTime"
-            value={formData.startTime}
+            name="auctionStartTime"
+            value={formData.auctionStartTime}
             onChange={handleChange}
             required
           />
@@ -186,16 +213,16 @@ export default function CreateAuction() {
         <div className="mb-4">
           <label
             className="block text-gray-700 text-sm font-bold mb-2"
-            htmlFor="endTime"
+            htmlFor="auctionEndTime"
           >
             End Time
           </label>
           <input
             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            id="endTime"
+            id="auctionEndTime"
             type="datetime-local"
-            name="endTime"
-            value={formData.endTime}
+            name="auctionEndTime"
+            value={formData.auctionEndTime}
             onChange={handleChange}
             required
           />
@@ -236,13 +263,21 @@ export default function CreateAuction() {
         )}
         <div className="flex items-center justify-between">
           <button
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            className={`bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ${
+              mutation.isPending ? "opacity-50 cursor-not-allowed" : ""
+            }`}
             type="submit"
+            disabled={mutation.isPending}
           >
-            Create Auction
+            {mutation.isPending ? "Creating..." : "Create Auction"}
           </button>
         </div>
       </form>
+      {mutation.isError && (
+        <div className="text-red-500 text-center mt-4">
+          An error occurred while creating the auction. Please try again.
+        </div>
+      )}
     </div>
   );
 }

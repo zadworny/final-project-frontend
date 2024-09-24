@@ -1,13 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import AuthModal from "./authModal";
+import axios from "axios";
+import { useAccount } from "wagmi";
 
 const Navigation = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { address, isConnected } = useAccount();
+
+  useEffect(() => {
+    if (isConnected && address) {
+      connectWallet(address);
+    }
+  }, [isConnected, address]);
+
+  const connectWallet = async (walletAddress: string) => {
+    try {
+      const response = await axios.post("/connectwallet", {
+        walletAddress: walletAddress,
+      });
+      const { token } = response.data;
+      localStorage.setItem("authToken", token);
+      console.log("Wallet connected and user logged in");
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+    }
+  };
 
   return (
     <nav className="bg-gray-800 p-4">
@@ -36,12 +58,6 @@ const Navigation = () => {
           <Link href="/my-wins" className="text-white hover:text-gray-400">
             My Wins
           </Link>
-          {/* <button
-            onClick={() => setIsModalOpen(true)}
-            className="text-white hover:text-gray-300"
-          >
-            Sign In
-          </button> */}
         </div>
         <ConnectButton />
       </div>
