@@ -22,8 +22,8 @@ const AuctionCard = ({ id, name, image, currentBid, endTime, status }: Auction) 
       </div>
       <div className="p-4">
         <h3 className="text-lg font-semibold mb-2">{name}</h3>
-        <p className="text-gray-600">Current Bid: ${currentBid}</p>
-        <p className="text-sm text-gray-500">Ends: {new Date(endTime).toLocaleString()}</p>
+        <p className="text-gray-600 font-semibold">Current Bid: Ξ{currentBid}</p>
+        <p className="text-sm text-gray-500 font-semibold">Ends: {new Date(endTime).toLocaleString()}</p>
       </div>
     </div>
   </Link>

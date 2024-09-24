@@ -28,7 +28,7 @@ export default function AuctionDetails() {
     } else if (balance && bid > parseFloat(balance.formatted)) {
       setError(`Bid cannot exceed your wallet balance of ${balance.formatted} ${balance.symbol}`);
     } else {
-      alert(`Placed bid of $${bid}`);
+      alert(`Placed bid of Ξ${bid}`);
       setError('');
     }
   };
@@ -56,10 +56,10 @@ export default function AuctionDetails() {
             <h1 className="text-4xl font-bold text-gray-900 mb-4">{auction.name}</h1>
             <p className="text-lg text-gray-800 mb-4">{auction.description}</p>
             <div className="mb-6 space-y-2">
-              <p className="text-2xl font-semibold text-gray-900">Current Bid: ${auction.currentBid}</p>
-              <p className="text-sm text-gray-600">Starting Bid: ${auction.startBidPrice}</p>
-              <p className="text-sm text-gray-600">Start Time: {new Date(auction.startTime).toLocaleString()}</p>
-              <p className="text-sm text-gray-600">End Time: {new Date(auction.endTime).toLocaleString()}</p>
+              <p className="text-2xl font-semibold text-gray-900 ">Current Bid: Ξ{auction.currentBid}</p>
+              {/* <p className="text-sm text-gray-600">Starting Bid: ${auction.startBidPrice}</p> */}
+              <p className="text-sm text-gray-600 font-semibold">Start Time: {new Date(auction.startTime).toLocaleString()}</p>
+              <p className="text-sm text-gray-600 font-semibold">End Time: {new Date(auction.endTime).toLocaleString()}</p>
               <p className={`text-sm font-semibold ${auction.status === 'ongoing' ? 'text-green-600' : 'text-red-600'}`}>
                 Status: {auction.status.charAt(0).toUpperCase() + auction.status.slice(1)}
               </p>
@@ -69,7 +69,7 @@ export default function AuctionDetails() {
               isConnected ? (
                 <form onSubmit={handleBid} className="mt-6">
                   <div className="mb-6">
-                    <label htmlFor="bidAmount" className="block text-sm font-medium text-gray-700">Your Bid</label>
+                    <label htmlFor="bidAmount" className="block text-sm font-medium text-gray-700 pb-2">Your Bid</label>
                     <input
                       type="number"
                       id="bidAmount"
