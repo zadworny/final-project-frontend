@@ -7,6 +7,7 @@ import { useAccount, useBalance } from 'wagmi';
 import Image from 'next/image';
 import { auctions, Auction } from '@/library/components/mockdb';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useContract } from '@/library/contexts/ContractContext'; // NEW 1/3
 import api from '@/app/api';
 
 
@@ -17,6 +18,7 @@ export default function AuctionDetails() {
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
+  const { price } = useContract(); // NEW 2/3
 
   const { data: auction, isLoading, isError } = useQuery<Auction>({
     queryKey: ['auction', id],
@@ -128,6 +130,12 @@ export default function AuctionDetails() {
           </div>
         </div>
       </div>
+
+      {/* NEW 3/3 */}
+      <p className={price==0 ? 'text-red-500' : 'text-gray-900'}>
+        <br/>Latest ETH/USD Price: <span className="text-gray-400">&nbsp;${price.toLocaleString()}</span>
+      </p>
+      
     </div>
   );
 }
