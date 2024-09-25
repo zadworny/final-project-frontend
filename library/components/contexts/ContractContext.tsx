@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { createPublicClient, http, parseEther } from 'viem';
 import { sepolia } from 'viem/chains';
 import { useAccount, useWalletClient } from 'wagmi';
@@ -234,72 +234,73 @@ export const CONTRACT_ABI = [
 	},
 	{
 		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
+		  {
+			"internalType": "uint256",
+			"name": "",
+			"type": "uint256"
+		  }
 		],
 		"name": "items",
 		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "itemId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address payable",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"internalType": "string",
-				"name": "name",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "description",
-				"type": "string"
-			},
-			{
-				"internalType": "uint256",
-				"name": "price",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "highestBidder",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "highestBidPrice",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "expiryDate",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "isSold",
-				"type": "bool"
-			},
-			{
-				"internalType": "string",
-				"name": "imageUrl",
-				"type": "string"
-			}
+		  {
+			"internalType": "uint256",
+			"name": "itemId",
+			"type": "uint256"
+		  },
+		  {
+			"internalType": "address payable",
+			"name": "owner",
+			"type": "address"
+		  },
+		  {
+			"internalType": "string",
+			"name": "name",
+			"type": "string"
+		  },
+		  {
+			"internalType": "string",
+			"name": "description",
+			"type": "string"
+		  },
+		  {
+			"internalType": "uint256",
+			"name": "price",
+			"type": "uint256"
+		  },
+		  {
+			"internalType": "address",
+			"name": "highestBidder",
+			"type": "address"
+		  },
+		  {
+			"internalType": "uint256",
+			"name": "highestBidPrice",
+			"type": "uint256"
+		  },
+		  {
+			"internalType": "uint256",
+			"name": "expiryDate",
+			"type": "uint256"
+		  },
+		  {
+			"internalType": "bool",
+			"name": "isSold",
+			"type": "bool"
+		  },
+		  {
+			"internalType": "string",
+			"name": "imageUrl",
+			"type": "string"
+		  }
 		],
 		"stateMutability": "view",
 		"type": "function"
-	}
+	  }
+	  
 ];
 export const CONTRACT_ADDRESS = '0x7194C573Ee4ed6E6DE8C4c03392024be658A0496';
 
-interface Auction {
+export interface Auction {
 	itemId: number;
 	owner: string;
 	name: string;
@@ -324,8 +325,8 @@ interface Auction {
   const ContractContext = createContext<ContractContextType | undefined>(undefined);
   
   export const ContractProvider = ({ children }: { children: ReactNode }) => {
-	const { address } = useAccount(); // Get user's address
-	const { data: walletClient } = useWalletClient(); // Get the wallet client
+	const { address } = useAccount();
+	const { data: walletClient } = useWalletClient();
 	const [client, setClient] = useState<any>(null);
 	const [price, setPrice] = useState<number>(0);
   
@@ -338,24 +339,38 @@ interface Auction {
 	  setClient(clientInstance);
 	}, []);
   
-	const fetchPrice = async () => {
-	  if (client) {
-		try {
-		  const result = await client.readContract({
-			address: CONTRACT_ADDRESS,
-			abi: CONTRACT_ABI,
-			functionName: 'getLatestETHUSDPrice',
-		  });
-		  console.log('Contract call result:', result);
-		  const adjustedPrice = Number(result) / 100000000;
-		  const formattedPrice = adjustedPrice.toFixed(2);
-		  setPrice(Number(formattedPrice));
-		} catch (error) {
-		  console.error('Error interacting with contract:', error);
-		  setPrice(0);
-		}
+	// Wrap fetchPrice with useCallback
+	const fetchPrice = useCallback(async () => {
+	  if (!client) {
+		console.log('Client not available in fetchPrice');
+		return;
 	  }
-	};
+	  try {
+		console.log('Fetching ETH/USD price...');
+		const result = await client.readContract({
+		  address: CONTRACT_ADDRESS,
+		  abi: CONTRACT_ABI,
+		  functionName: 'getLatestETHUSDPrice',
+		});
+		console.log('Contract call result:', result.toString());
+  
+		const adjustedPrice = Number(result) / 1e8; // Since the price has 8 decimals
+		console.log('Adjusted Price:', adjustedPrice);
+  
+		setPrice(adjustedPrice);
+	  } catch (error) {
+		console.error('Error interacting with contract:', error);
+		setPrice(0);
+	  }
+	}, [client]);
+  
+	// Call fetchPrice when client is initialized
+	useEffect(() => {
+	  if (client) {
+		console.log('Client is ready, fetching price');
+		fetchPrice();
+	  }
+	}, [client, fetchPrice]);
   
 	const placeBid = async (itemId: number, bidAmount: number) => {
 	  try {
@@ -403,53 +418,123 @@ interface Auction {
 	  }
 	};
   
-	const fetchAuctions = async (): Promise<Auction[]> => {
-	  if (!client) {
-		throw new Error('No client available');
-	  }
-	  try {
-		const itemCount = await client.readContract({
-		  address: CONTRACT_ADDRESS,
-		  abi: CONTRACT_ABI,
-		  functionName: 'itemCount',
-		});
-		const auctions: Auction[] = [];
-		for (let i = 0; i < itemCount; i++) {
-		  const item = await client.readContract({
+	const fetchAuctions = useCallback(async (): Promise<Auction[]> => {
+		if (!client) {
+		  throw new Error('No client available');
+		}
+		try {
+		  const itemCountResult = await client.readContract({
+			address: CONTRACT_ADDRESS,
+			abi: CONTRACT_ABI,
+			functionName: 'itemCount',
+		  });
+		  const itemCount = Number(itemCountResult);
+		  const auctions: Auction[] = [];
+	  
+		  for (let i = 1; i <= itemCount; i++) {
+			const itemData = await client.readContract({
+			  address: CONTRACT_ADDRESS,
+			  abi: CONTRACT_ABI,
+			  functionName: 'items',
+			  args: [BigInt(i)],
+			});
+	  
+			// Log the item data to verify its structure
+			console.log(`Item ${i}:`, itemData);
+	  
+			const [
+			  itemId,
+			  owner,
+			  name,
+			  description,
+			  price,
+			  highestBidder,
+			  highestBidPrice,
+			  expiryDate,
+			  isSold,
+			  imageUrl,
+			] = itemData;
+	  
+			auctions.push({
+			  itemId: Number(itemId),
+			  owner: owner,
+			  name: name,
+			  description: description,
+			  price: Number(price) / 1e18,
+			  highestBidder: highestBidder,
+			  highestBidPrice: Number(highestBidPrice) / 1e18,
+			  expiryDate: Number(expiryDate),
+			  isSold: isSold,
+			  imageUrl: imageUrl,
+			});
+		  }
+		  return auctions;
+		} catch (error) {
+		  console.error('Error fetching auctions:', error);
+		  throw error;
+		}
+	  }, [client]);	 
+	  
+	  const fetchAuctionById = useCallback(async (itemId: number): Promise<Auction> => {
+		if (!client) {
+		  throw new Error('No client available');
+		}
+		try {
+		  const itemData = await client.readContract({
 			address: CONTRACT_ADDRESS,
 			abi: CONTRACT_ABI,
 			functionName: 'items',
-			args: [i],
+			args: [BigInt(itemId)],
 		  });
-		  auctions.push({
-			itemId: item.itemId,
-			owner: item.owner,
-			name: item.name,
-			description: item.description,
-			price: Number(item.price),
-			highestBidder: item.highestBidder,
-			highestBidPrice: Number(item.highestBidPrice),
-			expiryDate: Number(item.expiryDate),
-			isSold: item.isSold,
-			imageUrl: item.imageUrl,
-		  });
+	  
+		  // Destructure the returned data
+		  const [
+			itemIdResult,
+			owner,
+			name,
+			description,
+			price,
+			highestBidder,
+			highestBidPrice,
+			expiryDate,
+			isSold,
+			imageUrl,
+		  ] = itemData;
+	  
+		  const auction: Auction = {
+			itemId: Number(itemIdResult),
+			owner: owner,
+			name: name,
+			description: description,
+			price: Number(price) / 1e18, // Convert Wei to Ether
+			highestBidder: highestBidder,
+			highestBidPrice: Number(highestBidPrice) / 1e18, // Convert Wei to Ether
+			expiryDate: Number(expiryDate),
+			isSold: isSold,
+			imageUrl: imageUrl,
+		  };
+		  return auction;
+		} catch (error) {
+		  console.error('Error fetching auction:', error);
+		  throw error;
 		}
-		return auctions;
-	  } catch (error) {
-		console.error('Error fetching auctions:', error);
-		throw error;
-	  }
-	};
+	  }, [client]);
   
-	useEffect(() => {
-	  fetchPrice();
-	}, [client]);
-  
-	return (
-	  <ContractContext.Provider value={{ client, price, fetchPrice, finalizeAuction, placeBid, fetchAuctions }}>
-		{children}
-	  </ContractContext.Provider>
-	);
+	  return (
+		<ContractContext.Provider
+		  value={{
+			client,
+			price,
+			fetchPrice,
+			finalizeAuction,
+			placeBid,
+			fetchAuctions,
+			fetchAuctionById
+		  }}
+		>
+		  {children}
+		</ContractContext.Provider>
+	  );
   };
   
   export const useContract = () => {
