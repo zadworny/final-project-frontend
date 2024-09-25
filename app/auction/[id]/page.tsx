@@ -1,46 +1,71 @@
 // app/auction/[id]/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAccount, useBalance } from 'wagmi';
 import Image from 'next/image';
-import { auctions } from '@/library/components/mockdb';
-import { useContract } from '@/library/contexts/ContractContext';
+import { useContract, Auction } from '@/library/contexts/ContractContext';
 
 export default function AuctionDetails() {
   const { id } = useParams();
-  const { isConnected } = useAccount();
-  const { data: balance } = useBalance();
+  const { isConnected, address } = useAccount();
+  const { data: balance } = useBalance({ address });
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
-  const { price, placeBid } = useContract();
+  const { price, placeBid, fetchAuctionById } = useContract();
+  const [auction, setAuction] = useState<Auction | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const auction = auctions.find((a) => a.id === Number(id));
+  useEffect(() => {
+    const getAuction = async () => {
+      try {
+        const auctionData = await fetchAuctionById(Number(id));
+        setAuction(auctionData);
+      } catch (err) {
+        console.error('Error fetching auction:', err);
+        setError('Failed to load auction');
+      } finally {
+        setLoading(false);
+      }
+    };
+    getAuction();
+  }, [fetchAuctionById, id]);
+
+  if (loading) {
+    return <div>Loading auction...</div>;
+  }
 
   if (!auction) {
-    return <div>Auction not found</div>;
+    return <div>{error || 'Auction not found'}</div>;
   }
 
   const handleBid = async (e: React.FormEvent) => {
     e.preventDefault();
     const bid = parseFloat(bidAmount);
 
-    if (bid <= auction.currentBid) {
-      setError(`Bid must be higher than the current bid of Ξ${auction.currentBid}`);
-    } else if (balance && bid > parseFloat(balance.formatted)) {
+    if (bid <= auction.highestBidPrice) {
+      setError(`Bid must be higher than the current bid of Ξ${auction.highestBidPrice}`);
+    } else if (balance && bid > parseFloat(balance.formatted || '0')) {
       setError(`Bid cannot exceed your wallet balance of ${balance.formatted} ${balance.symbol}`);
     } else {
       try {
-        await placeBid(auction.id, bid);
+        await placeBid(auction.itemId, bid);
         alert(`Placed bid of Ξ${bid}`);
         setError('');
+        setBidAmount('');
+        // Optionally, refresh the auction data
+        const updatedAuction = await fetchAuctionById(auction.itemId);
+        setAuction(updatedAuction);
       } catch (err) {
         setError('Error placing bid, please try again.');
         console.error('Error during placing bid:', err);
       }
     }
   };
+
+  const isExpired = auction.expiryDate * 1000 <= Date.now();
+  const status = auction.isSold ? 'completed' : isExpired ? 'expired' : 'ongoing';
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -50,7 +75,7 @@ export default function AuctionDetails() {
           <div className="md:w-1/2 bg-gray-200">
             <div className="relative w-full h-[500px]">
               <Image 
-                src={auction.image} 
+                src={auction.imageUrl} 
                 alt={auction.name} 
                 fill 
                 style={{ objectFit: 'contain' }} 
@@ -66,21 +91,29 @@ export default function AuctionDetails() {
             <p className="text-lg text-gray-800 mb-4">{auction.description}</p>
             <div className="mb-6 space-y-2">
               <p className="text-2xl font-semibold text-gray-900 ">
-                Current Bid: Ξ{auction.currentBid} 
-                <span className="text-gray-400 font-normal">&nbsp;${parseFloat((price * auction.currentBid).toFixed(2)).toLocaleString()}</span>
+                Current Bid: Ξ{auction.highestBidPrice.toFixed(4)} 
+                <span className="text-gray-400 font-normal">
+                  &nbsp;${(price * auction.highestBidPrice).toFixed(2)}
+                </span>
               </p>
-              <p className="text-sm text-gray-600 font-semibold">Start Time: {new Date(auction.startTime).toLocaleString()}</p>
-              <p className="text-sm text-gray-600 font-semibold">End Time: {new Date(auction.endTime).toLocaleString()}</p>
-              <p className={`text-sm font-semibold ${auction.status === 'ongoing' ? 'text-green-600' : 'text-red-600'}`}>
-                Status: {auction.status.charAt(0).toUpperCase() + auction.status.slice(1)}
+              <p className="text-sm text-gray-600 font-semibold">
+                Start Time: {new Date(auction.expiryDate * 1000 - 7 * 24 * 3600 * 1000).toLocaleString()}
+              </p>
+              <p className="text-sm text-gray-600 font-semibold">
+                End Time: {new Date(auction.expiryDate * 1000).toLocaleString()}
+              </p>
+              <p className={`text-sm font-semibold ${status === 'ongoing' ? 'text-green-600' : 'text-red-600'}`}>
+                Status: {status.charAt(0).toUpperCase() + status.slice(1)}
               </p>
             </div>
 
-            {auction.status === 'ongoing' ? (
+            {status === 'ongoing' ? (
               isConnected ? (
                 <form onSubmit={handleBid} className="mt-6">
                   <div className="mb-6">
-                    <label htmlFor="bidAmount" className="block text-sm font-medium text-gray-700 pb-2">Your Bid</label>
+                    <label htmlFor="bidAmount" className="block text-sm font-medium text-gray-700 pb-2">
+                      Your Bid
+                    </label>
                     <input
                       type="number"
                       id="bidAmount"
@@ -88,15 +121,12 @@ export default function AuctionDetails() {
                       onChange={(e) => setBidAmount(e.target.value)}
                       className="input"
                       placeholder="Enter bid amount"
-                      min={auction.currentBid}
-                      step="0.01"
+                      min={auction.highestBidPrice + 0.0001} // To ensure bid is higher
+                      step="0.0001"
                       required
                     />
                   </div>
-                  <button
-                    type="submit"
-                    className="btn w-full"
-                  >
+                  <button type="submit" className="btn w-full">
                     Place Bid
                   </button>
                   {error && <p className="text-error mt-2">{error}</p>}
@@ -108,10 +138,10 @@ export default function AuctionDetails() {
               <div className="mt-6 p-4 bg-gray-100 rounded-md">
                 <h2 className="text-xl font-semibold text-gray-800 mb-2">Auction Ended</h2>
                 <p className="text-gray-700">
-                  Winning Bid: <span className="font-semibold">Ξ{auction.currentBid}</span>
+                  Winning Bid: <span className="font-semibold">Ξ{auction.highestBidPrice}</span>
                 </p>
                 <p className="text-gray-700">
-                  Winner: <span className="font-semibold">{auction.winnerId || 'No winner'}</span>
+                  Winner: <span className="font-semibold">{auction.highestBidder || 'No winner'}</span>
                 </p>
               </div>
             )}
@@ -120,7 +150,8 @@ export default function AuctionDetails() {
       </div>
 
       <p className={price === 0 ? 'text-red-500' : 'text-gray-900'}>
-        <br/>Latest ETH/USD Price: <span className="text-gray-400">&nbsp;${price.toLocaleString()}</span>
+        <br />
+        Latest ETH/USD Price: <span className="text-gray-400">&nbsp;${price.toFixed(2)}</span>
       </p>
     </div>
   );
